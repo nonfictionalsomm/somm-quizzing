@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robust Wine Study Quiz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .feedback-animation {
+            animation: fadeIn .3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card {
+            perspective: 1000px;
+        }
+        .card-inner {
+            transition: transform 0.6s, height 0.4s ease-in-out; /* Added height transition */
+            transform-style: preserve-3d;
+        }
+        .card.is-flipped .card-inner {
+            transform: rotateX(180deg);
+        }
+        .card-face {
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+        .card-face-back {
+            transform: rotateX(180deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div id="quiz-container" class="bg-white w-full max-w-3xl p-6 sm:p-8 rounded-2xl shadow-lg transition-all duration-500 min-h-[550px] relative flex flex-col">
+        
+        <button id="main-menu-btn" class="hidden absolute top-4 right-4 bg-gray-200 text-gray-700 font-semibold py-2 px-4 rounded-lg hover:bg-gray-300 transition text-sm z-10">Main Menu</button>
+        
+        <!-- Main Menu Screen -->
+        <div id="main-menu-screen" class="flex flex-col items-center justify-center h-full flex-grow">
+            <h1 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-4">Wine Study Hub</h1>
+            <p class="text-gray-600 text-center mb-8 max-w-lg">Choose a mode to begin your study session.</p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                 <button id="start-flashcard-btn" class="bg-teal-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-teal-700 transition-transform transform hover:scale-105">Study Flashcards</button>
+                <button id="start-quiz-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:scale-105">Start Adaptive Quiz</button>
+            </div>
+        </div>
+
+        <!-- Flashcard Screen -->
+        <div id="flashcard-screen" class="hidden h-full flex flex-col">
+            <h2 class="text-2xl font-bold text-gray-800 mb-2 text-center">Flashcard Mode</h2>
+            <p id="flashcard-progress" class="text-center text-gray-500 mb-4">Card 1 / 347</p>
+            <div id="flashcard-container" class="card w-full mb-4">
+                <div class="card-inner relative w-full rounded-xl shadow-sm">
+                    <div class="card-face card-face-front absolute w-full h-full flex flex-col items-center justify-center p-6 rounded-xl border bg-slate-50">
+                        <p class="text-gray-500 text-sm mb-2 font-medium">QUESTION</p>
+                        <p id="flashcard-question" class="text-xl md:text-2xl text-center font-semibold text-gray-800"></p>
+                    </div>
+                    <div class="card-face card-face-back absolute w-full h-full flex flex-col items-center justify-center p-6 rounded-xl border bg-slate-50">
+                        <p class="text-teal-600 text-sm mb-2 font-bold">ANSWER</p>
+                        <p id="flashcard-answer" class="text-lg md:text-xl text-center text-gray-700"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-auto flex-shrink-0">
+                <div class="flex justify-center">
+                     <button id="flip-card-btn" class="bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg shadow hover:bg-indigo-600 transition">Flip Card</button>
+                </div>
+                <div class="mt-6 flex justify-between items-center">
+                    <button id="prev-card-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400 transition">Previous</button>
+                    <button id="next-card-btn" class="bg-gray-300 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-400 transition">Next</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden flex flex-col h-full">
+            <div class="flex justify-between items-baseline mb-6">
+                <div>
+                    <h2 id="round-title" class="text-xl font-bold text-gray-800">Round 1</h2>
+                    <p id="progress-text" class="text-gray-500">Question 1 of 20</p>
+                </div>
+            </div>
+            
+            <div class="flex-grow">
+                <div id="question-area" class="mb-6">
+                    <p id="question-text" class="text-xl text-gray-700 font-medium text-center min-h-[84px] flex items-center justify-center"></p>
+                </div>
+                
+                <div id="answer-area" class="flex flex-col items-center gap-4">
+                    <input type="text" id="answer-input" class="w-full max-w-md border-2 border-gray-300 rounded-lg p-3 text-center focus:border-indigo-500 focus:ring-indigo-500 transition" placeholder="Type your answer here">
+                    <button id="submit-btn" class="bg-indigo-500 text-white font-bold py-2 px-8 rounded-lg shadow hover:bg-indigo-600 transition">Submit</button>
+                </div>
+
+                <div id="feedback-area" class="mt-4 text-center font-medium min-h-[72px] p-2 flex flex-col justify-center"></div>
+            </div>
+
+            <div class="mt-auto pt-4 flex justify-between items-center">
+                 <div id="navigation-area" class="flex-grow flex justify-center">
+                    <button id="next-btn" class="hidden bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700">Next Question</button>
+                </div>
+                <p id="mastery-progress" class="text-md font-medium text-indigo-600 self-end">Mastered: 0 / 347</p>
+            </div>
+        </div>
+
+        <!-- Round Summary Screen -->
+        <div id="round-summary-screen" class="hidden flex-grow flex flex-col items-center justify-center h-full">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Round Complete!</h2>
+            <p class="text-lg text-gray-600 mb-2">Your score for this round:</p>
+            <p id="score-text" class="text-5xl font-bold text-indigo-600 mb-8">0%</p>
+            <button id="next-round-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700">Start Next Round</button>
+        </div>
+
+        <!-- Mastery Screen -->
+        <div id="mastery-screen" class="hidden flex-grow flex flex-col items-center justify-center h-full">
+            <h2 class="text-3xl font-bold text-green-600 mb-4">Congratulations!</h2>
+            <p class="text-xl text-gray-700 text-center mb-6">You have correctly answered all 347 questions!</p>
+            <p class="text-gray-600 text-center mb-8 max-w-lg">You've mastered the material. Continue playing to reinforce your knowledge and keep it fresh.</p>
+            <button id="restart-btn" class="bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-green-700">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const quizData = [
+            // Week 1
+            { question: "Rubin is a crossing of which grape varieties and from which country?", answer: "It is a cross of Nebbiolo and Syrah from Bulgaria." },
+            { question: "What are the main red and white grape varieties in Bulgaria?", answer: "Red: Merlot, Cabernet Sauvignon, Rubin. White: Red Misket, Muscat Ottonel, Rkatsiteli, Dimiat" },
+            { question: "What is Tidal Bay, where is it produced, and what is its maximum ABV?", answer: "An appellation wine from Nova Scotia, Canada, with a maximum ABV of 11%." },
+            { question: "Which producer made the first estate-bottled Châteauneuf-du-Pape, and when?", answer: "Château La Nerthe, in 1785." },
+            { question: "What are the two VDN appellations in the Southern Rhône?", answer: "Muscat de Beaumes-de-Venise and Rasteau." },
+            { question: "What are the red-only appellations in the Southern Rhône?", answer: "Vinsobres and Beaumes-de-Venise." },
+            { question: "What is the white-only appellation in the Southern Rhône, where is it located, and what is the grape?", answer: "Clairette de Bellegarde, within Costières de Nîmes, made from 100% Clairette." },
+            { question: "What was the original name of the Costières de Nîmes AOP, and when did it change?", answer: "Originally Costières du Gard (1986), changed in 1989." },
+            { question: "Which Pfalz Grosse Lage site is located on the French side?", answer: "Schweiger Kammerberg." },
+            { question: "What are the three grapes authorized for VDP Grosse Lage bottlings in the Pfalz?", answer: "Riesling, Spätburgunder, and Weissburgunder." },
+            { question: "What wine region is directly north of Pfalz?", answer: "Rheinhessen." },
+            { question: "What wine region is directly east and south of Pfalz?", answer: "Baden." },
+            { question: "What wine region is southwest of Pfalz?", answer: "Alsace." },
+            { question: "What happened in the Okanagan Valley in 2024?", answer: "A devastating frost killed 99% of the grapes and many vines." },
+            { question: "What is the minimum picking temperature for Canadian Icewine vs. German Eiswein?", answer: "Canada: -8°C; Germany: -7°C." },
+            { question: "What is the most widely planted grape in Ontario?", answer: "Vidal." },
+            { question: "What is the Southern Rhône Valley's northernmost appellation?", answer: "Grignan-les-Adhémar AOP." },
+            { question: "As of what vintage can Gigondas AOC produce white wines?", answer: "2023." },
+            { question: "What is the name of the Bulgarian grape that is a cross between Nebbiolo and Syrah?", answer: "Rubin." },
+            { question: "Who owns Bessa Valley winery in Bulgaria?", answer: "The proprietors of Château Canon La Gaffelière." },
+            { question: "What are the two main regional zones for wine production in Bulgaria?", answer: "Thracian Lowlands and Danubian Plain." },
+            { question: "Which Châteauneuf-du-Pape producer uses all 13 permitted grape varieties?", answer: "Beaucastel." },
+            { question: "Which Châteauneuf-du-Pape producer is known for single-varietal Grenache wines?", answer: "Rayas." },
+            { question: "Which hybrid grape is commonly used for icewine in the Niagara Peninsula, and who are its parents?", answer: "Vidal Blanc, a cross of Ugni Blanc and Rayon d’Or." },
+            { question: "What mountain range protects the vineyards of the Pfalz?", answer: "The Haardt Mountains, which are part of the Vosges." },
+            { question: "Where does the name “Pfalz” come from?", answer: "From the Latin palatinus, meaning 'of the palace'." },
+            { question: "Who are three top producers of Scheurebe in the Pfalz?", answer: "Müller-Catoir, Lingenfelder, and Pfeffingen." },
+            { question: "What region made a law forbidding 'flying saucers', and what wine riffs on this?", answer: "Châteauneuf-du-Pape; Le Cigare Volant by Bonny Doon." },
+            { question: "What has historically been the most important sector of the Pfalz?", answer: "Mittelhaardt." },
+            { question: "Who are the 'three Bs' from the Mittelhaardt region?", answer: "Reichsrat von Buhl, Bürklin-Wolf, and Bassermann-Jordan." },
+            { question: "Does 'Reserve' have a legal meaning for Bulgarian wines?", answer: "Yes, it means matured for at least one year from one variety." },
+            { question: "What is another name for Ugni Blanc in Italy?", answer: "Trebbiano Toscano." },
+            { question: "Syrah is a cross between which two grapes?", answer: "Dureza and Mondeuse Blanche." },
+            { question: "In France, the Rhône River flows from the Swiss Alps through what mountain range?", answer: "The Jura Mountains." },
+            { question: "Which subregions in the Northern and Southern Rhône gained their AOC status first (both in 1936)?", answer: "Château-Grillet (Northern) and Châteauneuf-du-Pape (Southern)." },
+            { question: "Can a white wine made in Côte-Rôtie be labeled with AOC status?", answer: "No, the AOC is for red wines only." },
+            { question: "What is the oldest recorded date of winemaking in the Rhône Valley?", answer: "500 BC, by the Etruscan Civilization." },
+            // Week 2
+            { question: "In Romania, what are the three subcategories for DOC wines based on ripeness?", answer: "DOC-CMD (full ripeness), DOC-CT (late harvest), DOC-CIB (botrytis)." },
+            { question: "What are the two regulated aging terms in Romania?", answer: "Reserva (6mo barrel, 6mo bottle) and Vin de Vinotecă (1yr barrel, 4yr bottle)." },
+            { question: "What mountains are in the center of Romania?", answer: "The Carpathian Mountains." },
+            { question: "Which two classified properties in the Médoc have remained in the hands of the same family since 1855?", answer: "Château Mouton Rothschild and Château Léoville Barton." },
+            { question: "Which château first announced it would no longer use the En Primeur system, starting with the 2012 vintage?", answer: "Château Latour." },
+            { question: "What separates Saint-Estèphe from Pauillac?", answer: "The Jalle de Breuil stream." },
+            { question: "What shields the Médoc from Atlantic weather?", answer: "The Landes forest." },
+            { question: "Name the second wines of Bordeaux's first growth producers.", answer: "Carruades de Lafite, Les Forts de Latour, Le Petit Mouton, Pavillon Rouge, Le Clarence de Haut-Brion." },
+            { question: "What were the only two changes made to the 1855 classification?", answer: "Château Cantemerle added (1855) and Château Mouton Rothschild elevated (1973)." },
+            { question: "Why are most grapes in New Zealand grown on the eastern side of the islands?", answer: "Mountain ranges create a rain shadow." },
+            { question: "Why is UV radiation higher in New Zealand, and how does this affect viticulture?", answer: "The ozone hole increases UV, leading to thicker grape skins and more anthocyanins." },
+            { question: "What is the quality sparkling wine group in Marlborough, and what are its requirements?", answer: "Méthode Marlborough; requires Chardonnay, Pinot Noir, Pinot Meunier and 18+ months on lees." },
+            { question: "What is a famous sweet wine appellation in Romania and its primary grapes?", answer: "Cotnari DOC, with Grasă de Cotnari being predominant." },
+            { question: "What is unique about the climate in Central Otago, and what grape dominates?", answer: "It is the only semi-continental climate in New Zealand; Pinot Noir dominates." },
+            { question: "What is Gimblett Gravels?", answer: "A subregion in Hawke's Bay, known for Bordeaux blends and Syrah." },
+            { question: "Why was wine quality in Romania poor from 1944-1989?", answer: "The communist regime prioritized quantity over quality." },
+            { question: "What are the top two white varieties planted in Romania?", answer: "Fetească Albă and Fetească Regală." },
+            { question: "What is the oldest producer in New Zealand, its founding year, and location?", answer: "Mission Estate, founded in 1851 in Hawke’s Bay." },
+            { question: "When and by whom were the first Sauvignon Blanc vines planted in Marlborough?", answer: "In 1975 by Montana Wines (now Brancott Estate)." },
+            { question: "Which commune in the Left Bank has the deepest croupes of gravel?", answer: "Pauillac." },
+            { question: "List the three First Growths in Pauillac from north to south.", answer: "Lafite-Rothschild, Mouton-Rothschild, Latour." },
+            { question: "Which commune has the highest proportion of classified growths?", answer: "St. Julien." },
+            { question: "Sauternes’ vineyards are situated near the confluence of what two rivers?", answer: "Ciron and Garonne." },
+            { question: "What are the three Léovilles?", answer: "Château Léoville-Las Cases, Château Léoville-Poyferré, and Château Léoville-Barton." },
+            { question: "How many classified growths are in Moulis AOP and Listrac AOP?", answer: "Zero." },
+            { question: "What indigenous Romanian red grape is cold and drought-resistant with thick skins?", answer: "Fetească Neagră." },
+            { question: "The Abel clone of Pinot Noir in New Zealand is rumored to be from where?", answer: "Domaine de la Romanée-Conti." },
+            { question: "What is the first region in the world to see the sunrise each day?", answer: "Gisborne." },
+            { question: "What is Gisborne’s most planted grape?", answer: "Chardonnay (over 50%)." },
+             // Week 3
+            { question: "When and where was Western Australia’s first vineyard planted?", answer: "In Swan Valley in 1829 by Thomas Walters." },
+            { question: "Name Western Australia's two oldest wineries.", answer: "Houghton (1836) and Sandalford (1840)." },
+            { question: "Who are the “first five” producers of Margaret River?", answer: "Leeuwin Estate, Cape Mentelle, Vasse Felix, Cullen, and Moss Wood." },
+            { question: "Who made Margaret River's first commercial wine, in what year, and with what grape?", answer: "Vasse Felix in 1971, with Riesling." },
+            { question: "Name the Grand Cru appellations of the Côte de Beaune.", answer: "Corton, Corton-Charlemagne, Charlemagne, Montrachet, and its four 'hyphenated' variations." },
+            { question: "Which two Grand Crus are split between Puligny-Montrachet and Chassagne-Montrachet?", answer: "Montrachet and Bâtard-Montrachet." },
+            { question: "How may producers label red wines from the Meursault climat Les Santenots?", answer: "As Volnay 1er Cru Santenots." },
+            { question: "Name the three communes that produce wines under the Maranges appellation.", answer: "Dezize-lès-Maranges, Cheilly-lès-Maranges, and Sampigny-lès-Maranges." },
+            { question: "What is the smallest white wine-producing Grand Cru in Burgundy?", answer: "Criots-Bâtard-Montrachet (1.75 ha)." },
+            { question: "The Mendocino wine region is centered at the confluence of which two rivers?", answer: "The Russian and Navarro Rivers." },
+            { question: "Which Champagne house established an American operation in Anderson Valley in 1982?", answer: "Louis Roederer." },
+            { question: "What is the smallest AVA in the continental USA?", answer: "Cole Ranch, in Mendocino County." },
+            { question: "What is the only winery in Guenoc Valley AVA?", answer: "Langtry Estate and Vineyards." },
+            { question: "What winery was the first to feature Mendocino County on its labels?", answer: "Parducci." },
+            { question: "What Pinot Noir brand in Anderson Valley is owned by Duckhorn?", answer: "Goldeneye." },
+            { question: "What is the tête de cuvée of Roederer Estate?", answer: "L’Ermitage Brut." },
+            { question: "What is the Gladstones Line?", answer: "A line at 115° longitude, the eastern border of Margaret River GI." },
+            { question: "The Gingin clone of Chardonnay in Margaret River is known for what issue?", answer: "Hens and chicks (millerandage)." },
+            { question: "Which Margaret River sub-region is considered the heart of the appellation?", answer: "Wilyabrup." },
+            { question: "Who encouraged Denis Horgan to develop Leeuwin Estate in 1972?", answer: "Robert Mondavi." },
+            { question: "The “Golden Triangle” within Wallcliffe is known as the top home for what varietal in Australia?", answer: "Chardonnay." },
+            { question: "What is the name of Bouchard’s monopole Beaune Premier Cru in Les Grèves?", answer: "Vigne l’Enfant Jésus." },
+            { question: "What are the four red wine-only appellations in the Côte de Beaune?", answer: "Pommard, Volnay, Côte de Beaune-Villages, and Blagny." },
+            { question: "Which is known for more powerful wines, Pommard or Volnay?", answer: "Pommard." },
+            { question: "Which Grand Crus of Montrachet are located only in Puligny-Montrachet?", answer: "Chevalier-Montrachet and Bienvenues-Bâtard-Montrachet." },
+            { question: "Which Grand Cru of Montrachet is located solely in Chassagne-Montrachet?", answer: "Criots-Bâtard-Montrachet." },
+            { question: "What did Clive Coates claim to be “the greatest white wine commune on earth”?", answer: "Puligny-Montrachet." },
+            { question: "What is the only Grand Cru in the Côte de Beaune that produces exclusively red wine?", answer: "Corton." },
+            { question: "What grape is most widely planted in Margaret River?", answer: "Cabernet Sauvignon." },
+            { question: "What is Mendocino Ridge AVA’s unique elevation requirement for vineyards?", answer: "A minimum of 1200 ft elevation, above the fog line." },
+            { question: "What makes Anderson Valley a top region for sparkling wine?", answer: "A cool climate influenced by fog and breezes from the Pacific." },
+            { question: "What mountain range separates Lake County from Napa Valley?", answer: "The Mayacamas Mountains." },
+            { question: "What soils dominate Red Hills AVA in Lake County, and what grape thrives there?", answer: "Volcanic, brick-red earth; Cabernet Sauvignon thrives there." },
+            { question: "Who was the most famous historic resident of Château de Santenay?", answer: "Duke Philip the Bold." },
+            // Week 5
+            { question: "What was the first modern winery in the Yarra Valley, established in 1963?", answer: "Wantirna Estate." },
+            { question: "What connects Port Phillip Bay with the Bass Strait?", answer: "The Rip." },
+            { question: "Which GI is the coolest region on the Australian mainland and has the highest vineyards in Port Phillip?", answer: "Macedon Ranges GI." },
+            { question: "What is the longest river in Australia?", answer: "The Murray River." },
+            { question: "What was Goulburn Valley’s first commercial winery, and what world's-oldest vines do they have?", answer: "Tahbilk, with the world's oldest Marsanne vines (1927)." },
+            { question: "What are the two fortified wines made in Rutherglen?", answer: "Topaque (from Muscadelle) and Muscat (from Brown Muscat)." },
+            { question: "Who made Australia’s first-ever traditional method sparkling wine in 1890?", answer: "Charles Pierlot at Great Western." },
+            { question: "Name a monopole MGA in Serralunga d'Alba owned by Giacomo Conterno.", answer: "Francia." },
+            { question: "Name a monopole MGA in Castiglione di Falletto owned by Giuseppe Mascarello.", answer: "Monprivato." },
+            { question: "Where are plantings prohibited in Barolo and Barbaresco DOCGs?", answer: "On valley floors and north-facing slopes." },
+            { question: "Which soil type in Barolo produces more aromatic wines?", answer: "Tortonian." },
+            { question: "Who are the three 'last of the Mohicans' (traditionalists) in Barolo?", answer: "Cappellano, Bartolo Mascarello, and Giuseppe Rinaldi." },
+            { question: "What was Piedmont's first DOC for white wines?", answer: "Erbaluce di Caluso (1967)." },
+            { question: "When were Barolo and Barbaresco elevated to DOCG?", answer: "1980." },
+            { question: "What is the appellation for traditional method sparkling wine in Piedmont?", answer: "Alta Langa DOCG." },
+            { question: "In Champagne, what is the maximum percentage of a harvest that can be sold as vintage?", answer: "80%." },
+            { question: "When was the Club Trésors de Champagne (Special Club) established?", answer: "1971." },
+            { question: "Name three Grand Cru villages in the Côte des Blancs.", answer: "Avize, Chouilly, Cramant, Le Mesnil-sur-Oger, Oger, Oiry." },
+            { question: "What is considered the first single-vineyard Champagne?", answer: "Philipponnat's Clos des Goisses." },
+            { question: "Who started viticulture in Victoria in 1838?", answer: "The Ryrie Brothers in the Yarra Valley." },
+            { question: "Where and when was phylloxera first discovered in Australia?", answer: "In 1877, in Geelong, Victoria." },
+            { question: "What river marks the border between Victoria and New South Wales?", answer: "The Murray River." },
+            { question: "What are the 5 regions of the Port Phillip Zone?", answer: "Yarra Valley, Macedon Ranges, Mornington Peninsula, Sunbury, and Geelong." },
+            { question: "Which French Champagne house created Domaine Chandon in the Yarra Valley?", answer: "Moët & Chandon." },
+            { question: "Who makes “Dry Red Wine No. 1” in the Yarra Valley?", answer: "Yarra Yering." },
+            { question: "What are the top two grapes planted in the Yarra Valley?", answer: "Pinot Noir and Chardonnay." },
+            { question: "What do they often call Shiraz in the Yarra Valley?", answer: "Syrah." },
+            { question: "Vineyards in the Macedon Ranges GI are between what elevations?", answer: "400 and 600 meters." },
+             // Week 7
+            { question: "What is the Côte de Nuits' largest Grand Cru vineyard?", answer: "Clos de Vougeot." },
+            { question: "What is the only Grand Cru in the Côte de Nuits where white wine is permitted?", answer: "Musigny." },
+            { question: "What is the only premier cru in Burgundy surrounded on all four sides by grands crus?", answer: "Aux Combottes in Gevrey-Chambertin." },
+            { question: "What road divides the grand crus of Gevrey-Chambertin?", answer: "The Route des Grands Crus." },
+            { question: "What is the only village appellation in Burgundy where all three colors of wine may be produced?", answer: "Marsannay." },
+            { question: "Name the monopole Grand Crus of Vosne-Romanée.", answer: "La Romanée, Romanée-Conti, La Tâche, La Grande Rue." },
+            { question: "What are the two official subzones of Prosecco DOCG?", answer: "Conegliano Valdobbiadene Prosecco and Asolo Prosecco." },
+            { question: "What new category was introduced in Prosecco in 2020?", answer: "Rosé (made with 10-15% Pinot Nero)." },
+            { question: "What geographical feature protects Prosecco from cold northern winds?", answer: "The Dolomites." },
+            { question: "In Prosecco, what does 'Rive' signify?", answer: "A specific hillside or riverbank vineyard." },
+            { question: "Name the five communes of the Valpolicella Classico subzone.", answer: "Sant’Ambrogio, Fumane, San Pietro in Cariano, Marano, and Negrar." },
+            { question: "What lake provides a moderating influence for the Valpolicella Classico subzone?", answer: "Lake Garda." },
+            { question: "What is the traditional training system for Corvina, which shades the grapes?", answer: "Pergola Veronese." },
+            { question: "What is a synonym for the grape Tai in Veneto?", answer: "Friulano." },
+            { question: "What is Torcolato?", answer: "A sweet, dried-grape wine from Breganze." },
+            { question: "What is the main grape of Soave DOC?", answer: "Garganega (min. 70%)." },
+            { question: "What is the name of the room where grapes are dried for Amarone?", answer: "A fruttaio." },
+            { question: "What is the ripasso method?", answer: "Re-fermenting Valpolicella wine on the pomace of Amarone or Recioto." },
+            { question: "Who was the first producer to use 'Ripasso' on a label?", answer: "Masi, in 1967." },
+            { question: "Who released 'Calvarino', one of the first single-vineyard Soave wines, in 1971?", answer: "Pieropan." },
+            { question: "What is Giuseppe Quintarelli’s 'Alzero'?", answer: "A 'Super Venetian' IGT made from dried Bordeaux varietals." },
+            { question: "What is the Italian name for the Charmat method?", answer: "Martinotti method." },
+            { question: "What is the most famous vineyard site for exceptional Prosecco?", answer: "Cartizze." },
+            { question: "Which Grand Cru can also be labeled as Chambertin?", answer: "Clos de Bèze." },
+            { question: "What is the best-known wine from Morey-Saint-Denis 1er Cru Monts Luisants?", answer: "Domaine Ponsot's old-vine Aligoté." },
+            { question: "What is considered the best 1er cru in Chambolle-Musigny?", answer: "Les Amoureuses." },
+            { question: "Which producer is the largest owner of the Gevrey-Chambertin 1er Cru Clos Saint-Jacques?", answer: "Domaine Armand Rousseau." },
+            { question: "Which domaine is famously known for its use of whole-cluster fermentation in the Côte de Nuits?", answer: "Domaine Dujac." },
+            // Week 8
+            { question: "What are the three sub-regions of the Douro, from west to east?", answer: "Baixo Corgo, Cima Corgo, Douro Superior." },
+            { question: "What is the main soil type of the Douro?", answer: "Schist." },
+            { question: "What are 'socalcos' in the Douro?", answer: "Narrow, old-school stone terraces that follow the contours of the land." },
+            { question: "What are 'patamares' in the Douro?", answer: "Modern, wider terraces created by earth-moving equipment without retaining walls." },
+            { question: "What city, across the river from Porto, is the center for Port aging?", answer: "Vila Nova de Gaia." },
+            { question: "What rootstock is commonly used in the Douro for its drought resistance?", answer: "110R." },
+            { question: "Who created Rosé Port, and when?", answer: "Croft, in 2008." },
+            { question: "What is Taylor’s Scion?", answer: "A very expensive Tawny Port from pre-phylloxera vines dating to 1855." },
+            { question: "What are the 8 crus of the Northern Rhône?", answer: "Côte-Rôtie, Condrieu, Château-Grillet, Saint-Joseph, Hermitage, Crozes-Hermitage, Cornas, Saint-Péray." },
+            { question: "What does Côte-Rôtie translate to?", answer: "'Roasted slope.'" },
+            { question: "In Côte-Rôtie, Viognier must be ________ with Syrah.", answer: "co-fermented." },
+            { question: "What are the two best-known lieux-dits in Côte-Rôtie?", answer: "Côte Brune and Côte Blonde." },
+            { question: "What compound in Syrah gives peppery notes?", answer: "Rotundone." },
+            { question: "In Château-Grillet, how are the vines mandated to be trained?", answer: "On single stakes (eschalas)." },
+            { question: "Who was the crusader-turned-hermit for whom the hill of Hermitage is named?", answer: "Henri Gaspard de Sterimberg." },
+            { question: "Where is the famous Garys’ Vineyard located?", answer: "Santa Lucia Highlands AVA." },
+            { question: "What grape was mistakenly sold as Mourvèdre to Central Coast producers in 2002?", answer: "Graciano." },
+            { question: "Who is considered the 'pioneer of Paso' for planting a vineyard there in 1973?", answer: "Gary Eberle." },
+            { question: "What is the most famous vineyard of the Santa Cruz Mountains AVA?", answer: "Ridge Vineyards' Monte Bello." },
+            { question: "Who planted California’s first commercial Syrah vines, and where?", answer: "Gary Eberle, in Paso Robles." },
+            { question: "Name the AVAs within Santa Ynez Valley.", answer: "Sta. Rita Hills, Happy Canyon, Los Olivos District, and Ballard Canyon." },
+            { question: "What was the Central Coast's first officially approved AVA (1981)?", answer: "Santa Maria Valley." },
+            { question: "What is the most famous vineyard in the Santa Maria Valley AVA?", answer: "Bien Nacido Vineyard." },
+            { question: "What is the name of the cold, dry wind that affects the Rhône valley?", answer: "The Mistral." },
+            { question: "What is the maximum percentage of Viognier allowed in Côte-Rôtie?", answer: "20%." },
+            { question: "Which Northern Rhône appellation must be 100% Syrah?", answer: "Cornas." },
+            { question: "What is the geologic divide between the schist and granite soils in Côte-Rôtie?", answer: "The Reynard tributary." },
+            { question: "Which Northern Rhône appellation exclusively produces Marsanne and Roussanne wines?", answer: "Saint-Péray." },
+            { question: "The dessert wine 'vin de paille' in Hermitage was revived by Gérard Chave and which other producer?", answer: "Chapoutier." },
+            { question: "Which Rhône AOC is the only one allowed to grow Pinot Noir?", answer: "Châtillon-en-Diois." },
+            { question: "Name the 'La La's' single-vineyard wines of E. Guigal.", answer: "La Mouline, La Turque, and La Landonne." },
+            { question: "What is the monopole appellation within Condrieu?", answer: "Château-Grillet AOP." },
+            { question: "Name two of the most famous sites of Cornas.", answer: "Reynard and Chaillot." },
+            { question: "In the Port 'beneficio' system, grapes from vineyards rated below what letter cannot be used to produce Port?", answer: "F." },
+            { question: "When fortifying Port, what is the ABV of the 'aguardente' (spirit) that is added?", answer: "77%." },
+            { question: "Which styles of Port will improve with bottle age?", answer: "Vintage Port, unfiltered LBV, and Single Quinta Vintage Port." },
+            { question: "Where is the world’s largest Rhône wine celebration, Hospice du Rhône, held annually?", answer: "Paso Robles." },
+            { question: "What is a common synonym for Tinta Roriz in Portugal?", answer: "Aragonez." },
+             // Week 9
+            { question: "Which 2 autonomous communities in Spain do not have any DOs?", answer: "Asturias and Cantabria." },
+            { question: "The northern coast of Spain is also called what?", answer: "Green Spain (España Verde)." },
+            { question: "What are the two DOCa regions in Spain?", answer: "Rioja (1991) and Priorat (2009)." },
+            { question: "Name the 5 village appellations of the Mâconnais.", answer: "Pouilly-Fuissé, Pouilly-Loché, Pouilly-Vinzelles, Saint-Véran, and Viré-Clessé." },
+            { question: "Only what color of wine can be labeled Mâcon-Villages?", answer: "White." },
+            { question: "What unique style of late-harvest Chardonnay is allowed in Viré-Clessé?", answer: "Blanc Levrouté." },
+            { question: "What was the first commercial winery in Rías Baixas (1904)?", answer: "Palacio de Fefiñanes." },
+            { question: "What two major rivers flow through Ribeira Sacra?", answer: "The Miño and Sil." },
+            { question: "What are the requirements for a Spanish wine to be classified as Vino de Pago?", answer: "Estate bottled from a single vineyard owned by the winery for at least 10 years." },
+            { question: "What two cities are the main hubs of production in Rioja Alta?", answer: "Haro and Logroño." },
+            { question: "What new vineyard classification was created in Rioja in 2017?", answer: "Viñedo Singular." },
+            { question: "Who were the 'Gratallops group' of 5 producers who led the revival of Priorat?", answer: "René Barbier, Álvaro Palacios, Daphne Glorian, José Luis Perez, and Carlos Pastrana." },
+            { question: "What is the Corpinnat association?", answer: "A group of sparkling wine producers who left the Cava DO for more stringent rules." },
+            { question: "What are the three traditional grape varietals in the Cava blend?", answer: "Xarel·lo, Macabeo, and Parellada." },
+            { question: "What indigenous red grape is the León DO most known for?", answer: "Prieto Picudo." },
+            { question: "What is a synonym for Tempranillo in Ribera del Duero?", answer: "Tinto Fino or Tinta del País." },
+            { question: "What is the only white grape permitted in Ribera del Duero?", answer: "Albillo Mayor." },
+            { question: "What is the original, largest, and coolest sub-zone of Rías Baixas?", answer: "Val do Salnés." },
+            { question: "What does Ribeira Sacra mean?", answer: "'Sacred Riverbank.'" },
+            { question: "What is the primary red grape in Ribeira Sacra?", answer: "Mencía." },
+            { question: "What does Valdeorras mean?", answer: "'Valley of Gold.'" },
+            { question: "A wine labeled 'Rueda Verdejo' must contain at least what percentage of Verdejo?", answer: "85%." },
+            { question: "Which famous Spanish producer owns Pintia in Toro?", answer: "Vega Sicilia." },
+            { question: "What are the two iconic geological features that define the landscape of Pouilly-Fuissé?", answer: "The Rock of Solutré and Rock of Vergisson." },
+            { question: "What is the most common red grape in the Mâconnais?", answer: "Gamay." },
+            { question: "What is the key red wine village in the Rheingau?", answer: "Assmannshausen." },
+            { question: "Name one of the three top vineyards in Rüdesheim.", answer: "Berg Roseneck, Berg Rottland, or Berg Schlossberg." },
+            { question: "What institution in Rheingau is the center of German viticultural research?", answer: "The Geisenheim Institute." },
+            { question: "What river separates Galicia from Portugal?", answer: "The Miño River." },
+            { question: "What soil type dominates Rías Baixas?", answer: "Granite." },
+            { question: "What is a 'minifundio' in the context of Rías Baixas?", answer: "A small, family-owned vineyard parcel." },
+            { question: "What is the dominant white grape in Txakoli production?", answer: "Hondarrabi Zuri." },
+            { question: "What high plateau does Castilla y León sit on?", answer: "The Meseta Central." },
+            { question: "What is the dominant red grape in Bierzo?", answer: "Mencía." },
+             // Week 10
+            { question: "Where was the first agricultural preserve founded in the USA?", answer: "Napa Valley." },
+            { question: "Napa produces what percentage of California wine by volume vs. value?", answer: "4% by volume, but over 25% by value." },
+            { question: "What was the first commercial winery in Napa (1861)?", answer: "Charles Krug." },
+            { question: "Who was the only journalist at the 1976 Judgment of Paris tasting?", answer: "George Taber." },
+            { question: "What was the issue with the AXR1 rootstock in Napa?", answer: "It was not fully resistant to phylloxera." },
+            { question: "Who is the consulting winemaker famous for working with Screaming Eagle, Bond, and Dalla Valle?", answer: "Andy Erickson." },
+            { question: "What Napa winery focuses exclusively on white wines from Italian varieties?", answer: "Massican." },
+            { question: "What was the 'French Paradox'?", answer: "A 1991 news report linking red wine to lower heart disease in France, sparking a wine boom." },
+            { question: "What was the first sub-AVA established in Napa (1983)?", answer: "Los Carneros." },
+            { question: "Is Pritchard Hill an AVA?", answer: "No." },
+            { question: "What is the second label of Continuum Estate?", answer: "Novicium." },
+            { question: "Who founded Dominus Estate in Napa Valley?", answer: "Christian Moueix of Château Petrus." },
+            { question: "Who founded Grgich Hills Estate?", answer: "Mike Grgich and Austin Hills." },
+            { question: "What was abnormal about the 1997 vintage in Napa that led to the 'extended hang time' trend?", answer: "It was warm and so abundant that lack of tank space forced late harvesting." },
+            { question: "Who founded Schramsberg in 1862, establishing Napa's first hillside vineyard?", answer: "Jacob Schram." },
+            { question: "What is the longest continuously operating winery in Napa Valley?", answer: "Beringer." },
+            { question: "Name the four satellite appellations of Saint-Émilion.", answer: "Lussac, Puisseguin, Montagne, and Saint-Georges." },
+            { question: "Which Right Bank region has the highest concentration of Malbec in Bordeaux?", answer: "Bourg." },
+            { question: "What weather event devastated Pomerol in 1956?", answer: "A severe frost." },
+            { question: "Which four famous châteaux withdrew from the 2022 Saint-Émilion classification?", answer: "Cheval Blanc, Angélus, Ausone, and La Gaffelière." },
+            { question: "On the Right Bank, is Single Guyot or Double Guyot training more common?", answer: "Single Guyot." },
+            { question: "Pomerol is encircled by the Dordogne and Barbanne rivers and which town?", answer: "Libourne." },
+            { question: "Which estate was promoted to Premier Grand Cru Classé A in 2022?", answer: "Château Figeac." },
+            { question: "Who was the influential winemaker at Beaulieu Vineyard (BV)?", answer: "André Tchelistcheff." },
+            { question: "List the valley floor AVAs of Napa Valley from north to south.", answer: "Calistoga, St. Helena, Rutherford, Oakville, Yountville, Stags Leap, Oak Knoll, Coombsville." },
+            { question: "Name three key producers based in the Oakville AVA.", answer: "Screaming Eagle, Opus One, Robert Mondavi, Harlan, Silver Oak, Scarecrow." },
+            { question: "Before co-founding his own winery, Mike Grgich made the winning 1973 Chardonnay at which Napa winery?", answer: "Chateau Montelena." },
+        ];
+        
+        // --- SCRIPT LOGIC ---
+        let allQuestions = [];
+        let currentRoundQuestions = [];
+        let shuffledFlashcards = [];
+        let flashcardIndex = 0;
+        let currentQuestionIndex = 0;
+        let roundScore = 0;
+        let roundNumber = 0;
+        const ROUND_SIZE = 20;
+        const TOTAL_QUESTIONS = quizData.length;
+
+        const ui = {
+            quizContainer: document.getElementById('quiz-container'),
+            mainMenuBtn: document.getElementById('main-menu-btn'),
+            mainMenuScreen: document.getElementById('main-menu-screen'),
+            startFlashcardBtn: document.getElementById('start-flashcard-btn'),
+            startQuizBtn: document.getElementById('start-quiz-btn'),
+            flashcardScreen: document.getElementById('flashcard-screen'),
+            flashcardProgress: document.getElementById('flashcard-progress'),
+            flashcardContainer: document.getElementById('flashcard-container'),
+            flashcardQuestion: document.getElementById('flashcard-question'),
+            flashcardAnswer: document.getElementById('flashcard-answer'),
+            flipCardBtn: document.getElementById('flip-card-btn'),
+            prevCardBtn: document.getElementById('prev-card-btn'),
+            nextCardBtn: document.getElementById('next-card-btn'),
+            quizScreen: document.getElementById('quiz-screen'),
+            summaryScreen: document.getElementById('round-summary-screen'),
+            masteryScreen: document.getElementById('mastery-screen'),
+            roundTitle: document.getElementById('round-title'),
+            progressText: document.getElementById('progress-text'),
+            masteryProgress: document.getElementById('mastery-progress'),
+            questionText: document.getElementById('question-text'),
+            answerInput: document.getElementById('answer-input'),
+            submitBtn: document.getElementById('submit-btn'),
+            feedbackArea: document.getElementById('feedback-area'),
+            nextBtn: document.getElementById('next-btn'),
+            scoreText: document.getElementById('score-text'),
+            nextRoundBtn: document.getElementById('next-round-btn'),
+            restartBtn: document.getElementById('restart-btn'),
+        };
+
+        function normalizeString(str) {
+            if (!str) return '';
+            return str
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[.,/#!$%\^&\*;:{}=\-_`~()'"]/g, "")
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function isSmartMatch(userAnswer, correctAnswer) {
+            const normUser = normalizeString(userAnswer);
+            const normCorrect = normalizeString(correctAnswer);
+
+            if (normUser === normCorrect) return true;
+            
+            const correctKeywords = new Set(normCorrect.split(' ').filter(word => word.length >= 3));
+            if (correctKeywords.size === 0) return normUser === normCorrect;
+
+            let matchCount = 0;
+            correctKeywords.forEach(keyword => {
+                if (normUser.includes(keyword)) {
+                    matchCount++;
+                }
+            });
+
+            const matchPercentage = matchCount / correctKeywords.size;
+            return matchPercentage >= 0.75;
+        }
+
+        function initializeGame() {
+            allQuestions = quizData.map((q, index) => ({
+                id: index,
+                question: q.question,
+                answer: q.answer,
+                weight: 10,
+                mastered: false,
+            }));
+            goToMainMenu();
+        }
+        
+        function goToMainMenu() {
+            showScreen('mainMenu');
+        }
+
+        function startFlashcards() {
+            shuffledFlashcards = [...allQuestions];
+            for (let i = shuffledFlashcards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffledFlashcards[i], shuffledFlashcards[j]] = [shuffledFlashcards[j], shuffledFlashcards[i]];
+            }
+            flashcardIndex = 0;
+            loadFlashcard();
+            showScreen('flashcard');
+        }
+
+        function loadFlashcard() {
+            const card = shuffledFlashcards[flashcardIndex];
+            ui.flashcardQuestion.textContent = card.question;
+            ui.flashcardAnswer.textContent = card.answer;
+            ui.flashcardProgress.textContent = `Card ${flashcardIndex + 1} / ${TOTAL_QUESTIONS}`;
+            ui.flashcardContainer.classList.remove('is-flipped');
+
+            requestAnimationFrame(() => {
+                const cardInner = ui.flashcardContainer.querySelector('.card-inner');
+                const frontFace = cardInner.querySelector('.card-face-front');
+                const backFace = cardInner.querySelector('.card-face-back');
+
+                const frontHeight = frontFace.scrollHeight;
+                const backHeight = backFace.scrollHeight;
+                
+                const tallerHeight = Math.max(frontHeight, backHeight, 200); // min height 200px
+                
+                cardInner.style.height = `${tallerHeight}px`;
+            });
+        }
+        
+        function startQuiz() {
+            roundNumber = 0;
+             allQuestions.forEach(q => {
+                q.mastered = false;
+                q.weight = 10;
+            });
+            startNewRound();
+        }
+
+        function startNewRound() {
+            roundNumber++;
+            roundScore = 0;
+            currentQuestionIndex = 0;
+            selectRoundQuestions();
+            
+            if (currentRoundQuestions.length === 0 && checkForMastery()) {
+                 return;
+            }
+
+            showScreen('quiz');
+            displayQuestion();
+        }
+
+        function selectRoundQuestions() {
+            const unmasteredQuestions = allQuestions.filter(q => !q.mastered);
+            const selectionPool = unmasteredQuestions.length > 0 ? unmasteredQuestions : allQuestions;
+
+            let weightedPool = [];
+            selectionPool.forEach(q => {
+                for (let i = 0; i < q.weight; i++) weightedPool.push(q);
+            });
+            
+            for (let i = weightedPool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [weightedPool[i], weightedPool[j]] = [weightedPool[j], weightedPool[i]];
+            }
+            
+            const roundSet = new Set();
+            currentRoundQuestions = [];
+            for(const question of weightedPool) {
+                if(!roundSet.has(question.id)) {
+                    roundSet.add(question.id);
+                    currentRoundQuestions.push(question);
+                }
+                if(currentRoundQuestions.length >= ROUND_SIZE) break;
+            }
+        }
+        
+        function displayQuestion() {
+            const masteryCount = allQuestions.filter(q => q.mastered).length;
+            ui.masteryProgress.textContent = `Mastered: ${masteryCount} / ${TOTAL_QUESTIONS}`;
+            ui.roundTitle.textContent = `Round ${roundNumber}`;
+            ui.progressText.textContent = `Question ${currentQuestionIndex + 1} of ${currentRoundQuestions.length}`;
+            
+            const question = currentRoundQuestions[currentQuestionIndex];
+            ui.questionText.textContent = question.question;
+
+            ui.feedbackArea.innerHTML = '';
+            ui.answerInput.value = '';
+            ui.answerInput.disabled = false;
+            ui.answerInput.className = "w-full max-w-md border-2 border-gray-300 rounded-lg p-3 text-center focus:border-indigo-500 focus:ring-indigo-500 transition";
+            ui.submitBtn.disabled = false;
+            ui.nextBtn.classList.add('hidden');
+            ui.answerInput.focus();
+        }
+
+        function handleSubmit() {
+            const userAnswer = ui.answerInput.value;
+            if (userAnswer.trim() === '') return;
+
+            const question = currentRoundQuestions[currentQuestionIndex];
+            const isCorrect = isSmartMatch(userAnswer, question.answer);
+
+            ui.answerInput.disabled = true;
+            ui.submitBtn.disabled = true;
+
+            if (isCorrect) {
+                roundScore++;
+                ui.feedbackArea.innerHTML = `<p class="text-green-600 feedback-animation">Correct!</p>`;
+                ui.answerInput.classList.add('border-green-500', 'bg-green-50');
+                updateWeight(question.id, true);
+            } else {
+                ui.feedbackArea.innerHTML = `
+                    <p class="text-red-600 feedback-animation">Incorrect.</p>
+                    <p class="text-gray-800 feedback-animation font-semibold">Correct Answer: ${question.answer}</p>
+                `;
+                ui.answerInput.classList.add('border-red-500', 'bg-red-50');
+                updateWeight(question.id, false);
+            }
+            ui.nextBtn.classList.remove('hidden');
+        }
+
+        function updateWeight(questionId, isCorrect) {
+            const question = allQuestions.find(q => q.id === questionId);
+            if (!question) return;
+
+            if (isCorrect) {
+                if (!question.mastered) {
+                    question.mastered = true;
+                    question.weight = 2;
+                } else {
+                    question.weight = Math.max(1, question.weight - 2);
+                }
+            } else {
+                question.weight = Math.min(50, question.weight + 10);
+            }
+        }
+        
+        function handleNextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentRoundQuestions.length) {
+                displayQuestion();
+            } else {
+                displayRoundSummary();
+            }
+        }
+
+        function displayRoundSummary() {
+            const percentage = Math.round((roundScore / currentRoundQuestions.length) * 100);
+            ui.scoreText.textContent = `${percentage}%`;
+            showScreen('summary');
+        }
+
+        function checkForMastery() {
+            const masteryCount = allQuestions.filter(q => q.mastered).length;
+            if (masteryCount === TOTAL_QUESTIONS) {
+                showScreen('mastery');
+                return true;
+            }
+            return false;
+        }
+
+        function showScreen(screenName) {
+            const screens = ['mainMenu', 'flashcard', 'quiz', 'summary', 'mastery'];
+            screens.forEach(s => {
+                const screenElement = ui[`${s}Screen`];
+                if (screenElement) {
+                    screenElement.classList.add('hidden');
+                }
+            });
+            
+            const screenToShow = ui[`${screenName}Screen`];
+            if (screenToShow) {
+                screenToShow.classList.remove('hidden');
+            }
+            
+            if (screenName === 'mainMenu') {
+                ui.mainMenuBtn.classList.add('hidden');
+            } else {
+                ui.mainMenuBtn.classList.remove('hidden');
+            }
+        }
+        
+        // --- Event Listeners ---
+        ui.mainMenuBtn.addEventListener('click', goToMainMenu);
+        ui.startFlashcardBtn.addEventListener('click', startFlashcards);
+        ui.startQuizBtn.addEventListener('click', startQuiz);
+        ui.flipCardBtn.addEventListener('click', () => ui.flashcardContainer.classList.toggle('is-flipped'));
+        ui.nextCardBtn.addEventListener('click', () => {
+            flashcardIndex = (flashcardIndex + 1) % TOTAL_QUESTIONS;
+            loadFlashcard();
+        });
+        ui.prevCardBtn.addEventListener('click', () => {
+            flashcardIndex = (flashcardIndex - 1 + TOTAL_QUESTIONS) % TOTAL_QUESTIONS;
+            loadFlashcard();
+        });
+        ui.submitBtn.addEventListener('click', handleSubmit);
+        ui.answerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleSubmit();
+        });
+        ui.nextBtn.addEventListener('click', handleNextQuestion);
+        ui.nextRoundBtn.addEventListener('click', () => {
+             if (!checkForMastery()) {
+                startNewRound();
+            }
+        });
+        ui.restartBtn.addEventListener('click', goToMainMenu);
+        
+        document.addEventListener('DOMContentLoaded', initializeGame);
+    </script>
+</body>
+</html>
+
