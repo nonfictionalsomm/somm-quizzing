@@ -49,8 +49,9 @@
             <h1 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-4">Wine Study Hub</h1>
             <p class="text-gray-600 text-center mb-8 max-w-lg">Choose a mode to begin your study session.</p>
             <div class="flex flex-col sm:flex-row gap-4">
-                 <button id="start-flashcard-btn" class="bg-teal-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-teal-700 transition-transform transform hover:scale-105">Study Flashcards</button>
-                <button id="start-quiz-btn" class="bg-indigo-600 text-white font-bold py-3 px-8 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:scale-105">Start Adaptive Quiz</button>
+                 <button id="start-flashcard-btn" class="bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-teal-700 transition-transform transform hover:scale-105">Study Flashcards</button>
+                 <button id="start-adaptive-quiz-btn" class="bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-purple-700 transition-transform transform hover:scale-105">Start Adaptive Quiz</button>
+                 <button id="start-full-quiz-btn" class="bg-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:scale-105">Full Quiz Challenge</button>
             </div>
         </div>
 
@@ -404,6 +405,7 @@
         let currentQuestionIndex = 0;
         let roundScore = 0;
         let roundNumber = 0;
+        let isAdaptiveMode = false;
         const ROUND_SIZE = 20;
         const TOTAL_QUESTIONS = quizData.length;
 
@@ -412,7 +414,8 @@
             mainMenuBtn: document.getElementById('main-menu-btn'),
             mainMenuScreen: document.getElementById('main-menu-screen'),
             startFlashcardBtn: document.getElementById('start-flashcard-btn'),
-            startQuizBtn: document.getElementById('start-quiz-btn'),
+            startAdaptiveQuizBtn: document.getElementById('start-adaptive-quiz-btn'),
+            startFullQuizBtn: document.getElementById('start-full-quiz-btn'),
             flashcardScreen: document.getElementById('flashcard-screen'),
             flashcardProgress: document.getElementById('flashcard-progress'),
             flashcardContainer: document.getElementById('flashcard-container'),
@@ -436,36 +439,32 @@
             nextRoundBtn: document.getElementById('next-round-btn'),
             restartBtn: document.getElementById('restart-btn'),
         };
+        
+        const stopWords = new Set(['the', 'a', 'an', 'is', 'it', 'was', 'are', 'in', 'of', 'from', 'what', 'who', 'which', 'and', 'with', 'its']);
 
-        function normalizeString(str) {
-            if (!str) return '';
-            return str
+        function getKeywords(str) {
+            if (!str) return [];
+            const normalized = str
                 .toLowerCase()
                 .normalize("NFD")
                 .replace(/[\u0300-\u036f]/g, "")
-                .replace(/[.,/#!$%\^&\*;:{}=\-_`~()'"]/g, "")
-                .replace(/\s+/g, ' ')
-                .trim();
+                .replace(/[\.,/#!$%\^&\*;:{}=\-_`~()'"]/g, " "); // Replace punctuation with space
+            
+            return normalized.split(/\s+/)
+                .map(word => word.trim())
+                .filter(word => word && !stopWords.has(word));
         }
 
         function isSmartMatch(userAnswer, correctAnswer) {
-            const normUser = normalizeString(userAnswer);
-            const normCorrect = normalizeString(correctAnswer);
+            const correctKeywords = getKeywords(correctAnswer);
+            const userKeywords = getKeywords(userAnswer);
 
-            if (normUser === normCorrect) return true;
+            if (correctKeywords.length === 0) {
+                return userKeywords.join(' ') === '';
+            }
             
-            const correctKeywords = new Set(normCorrect.split(' ').filter(word => word.length >= 3));
-            if (correctKeywords.size === 0) return normUser === normCorrect;
-
-            let matchCount = 0;
-            correctKeywords.forEach(keyword => {
-                if (normUser.includes(keyword)) {
-                    matchCount++;
-                }
-            });
-
-            const matchPercentage = matchCount / correctKeywords.size;
-            return matchPercentage >= 0.75;
+            // Every essential keyword from the correct answer must be present in the user's answer
+            return correctKeywords.every(keyword => userKeywords.includes(keyword));
         }
 
         function initializeGame() {
@@ -473,8 +472,14 @@
                 id: index,
                 question: q.question,
                 answer: q.answer,
-                weight: 10,
                 mastered: false,
+                // Full Quiz Mode properties
+                weight: 10,
+                // Adaptive Mode properties
+                incorrectCount: 0,
+                correctInARow: 0,
+                reinforceInRound: 0,
+                lastSeenRound: 0,
             }));
             goToMainMenu();
         }
@@ -485,6 +490,7 @@
 
         function startFlashcards() {
             shuffledFlashcards = [...allQuestions];
+            // Fisher-Yates shuffle
             for (let i = shuffledFlashcards.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffledFlashcards[i], shuffledFlashcards[j]] = [shuffledFlashcards[j], shuffledFlashcards[i]];
@@ -515,11 +521,25 @@
             });
         }
         
-        function startQuiz() {
+        function startFullQuiz() {
+            isAdaptiveMode = false;
             roundNumber = 0;
-             allQuestions.forEach(q => {
+            allQuestions.forEach(q => {
                 q.mastered = false;
                 q.weight = 10;
+            });
+            startNewRound();
+        }
+
+        function startAdaptiveQuiz() {
+            isAdaptiveMode = true;
+            roundNumber = 0;
+            allQuestions.forEach(q => {
+                q.mastered = false;
+                q.incorrectCount = 0;
+                q.correctInARow = 0;
+                q.reinforceInRound = 0;
+                q.lastSeenRound = 0;
             });
             startNewRound();
         }
@@ -528,7 +548,12 @@
             roundNumber++;
             roundScore = 0;
             currentQuestionIndex = 0;
-            selectRoundQuestions();
+
+            if (isAdaptiveMode) {
+                selectAdaptiveRoundQuestions();
+            } else {
+                selectFullQuizRoundQuestions();
+            }
             
             if (currentRoundQuestions.length === 0 && checkForMastery()) {
                  return;
@@ -538,15 +563,14 @@
             displayQuestion();
         }
 
-        function selectRoundQuestions() {
+        function selectFullQuizRoundQuestions() {
             const unmasteredQuestions = allQuestions.filter(q => !q.mastered);
             const selectionPool = unmasteredQuestions.length > 0 ? unmasteredQuestions : allQuestions;
 
             let weightedPool = [];
-            selectionPool.forEach(q => {
-                for (let i = 0; i < q.weight; i++) weightedPool.push(q);
-            });
+            selectionPool.forEach(q => { for (let i = 0; i < q.weight; i++) weightedPool.push(q); });
             
+            // Shuffle
             for (let i = weightedPool.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [weightedPool[i], weightedPool[j]] = [weightedPool[j], weightedPool[i]];
@@ -561,6 +585,58 @@
                 }
                 if(currentRoundQuestions.length >= ROUND_SIZE) break;
             }
+        }
+
+        function selectAdaptiveRoundQuestions() {
+            const incorrectPool = allQuestions
+                .filter(q => q.incorrectCount > 0)
+                .sort((a, b) => b.incorrectCount - a.incorrectCount);
+
+            const reinforcementPool = allQuestions
+                .filter(q => q.reinforceInRound === roundNumber && q.incorrectCount === 0);
+
+            const newPool = allQuestions
+                .filter(q => q.lastSeenRound === 0)
+                .sort(() => Math.random() - 0.5);
+            
+            const seenPool = allQuestions
+                .filter(q => q.lastSeenRound > 0 && q.incorrectCount === 0 && q.reinforceInRound !== roundNumber)
+                .sort((a, b) => a.lastSeenRound - b.lastSeenRound);
+
+            const incorrectTargetSize = Math.floor(ROUND_SIZE * 0.4);
+            const reinforcementTargetSize = Math.floor(ROUND_SIZE * 0.3);
+
+            let round = [];
+            let roundSet = new Set();
+
+            function addQuestionToRound(q) {
+                if (q && !roundSet.has(q.id)) {
+                    round.push(q);
+                    roundSet.add(q.id);
+                }
+            }
+
+            // 1. Add incorrect questions
+            for (let i = 0; i < incorrectTargetSize; i++) {
+                addQuestionToRound(incorrectPool.shift());
+            }
+
+            // 2. Add reinforcement questions
+            for (let i = 0; i < reinforcementTargetSize; i++) {
+                addQuestionToRound(reinforcementPool.shift());
+            }
+
+            // 3. Fill the rest of the round
+            while (round.length < ROUND_SIZE) {
+                let nextQuestion = incorrectPool.shift() || newPool.shift() || reinforcementPool.shift() || seenPool.shift();
+                if (nextQuestion) {
+                    addQuestionToRound(nextQuestion);
+                } else {
+                    break; // No more questions available
+                }
+            }
+
+            currentRoundQuestions = round;
         }
         
         function displayQuestion() {
@@ -595,31 +671,51 @@
                 roundScore++;
                 ui.feedbackArea.innerHTML = `<p class="text-green-600 feedback-animation">Correct!</p>`;
                 ui.answerInput.classList.add('border-green-500', 'bg-green-50');
-                updateWeight(question.id, true);
+                updateQuestionState(question.id, true);
             } else {
                 ui.feedbackArea.innerHTML = `
                     <p class="text-red-600 feedback-animation">Incorrect.</p>
                     <p class="text-gray-800 feedback-animation font-semibold">Correct Answer: ${question.answer}</p>
                 `;
                 ui.answerInput.classList.add('border-red-500', 'bg-red-50');
-                updateWeight(question.id, false);
+                updateQuestionState(question.id, false);
             }
             ui.nextBtn.classList.remove('hidden');
         }
 
-        function updateWeight(questionId, isCorrect) {
+        function updateQuestionState(questionId, isCorrect) {
             const question = allQuestions.find(q => q.id === questionId);
             if (!question) return;
 
-            if (isCorrect) {
-                if (!question.mastered) {
-                    question.mastered = true;
-                    question.weight = 2;
+            question.lastSeenRound = roundNumber;
+
+            if (isAdaptiveMode) {
+                if (isCorrect) {
+                    question.correctInARow++;
+                    // If it was previously wrong, now it's right, schedule reinforcement
+                    if (question.incorrectCount > 0) {
+                        question.incorrectCount = 0; // Reset incorrect count
+                        question.reinforceInRound = roundNumber + 3; // Re-ask in 3 rounds
+                    }
+                    if (question.correctInARow >= 2) {
+                        question.mastered = true;
+                    }
                 } else {
-                    question.weight = Math.max(1, question.weight - 2);
+                    question.incorrectCount++;
+                    question.correctInARow = 0;
+                    question.mastered = false; // Cannot be mastered if answered incorrectly
                 }
-            } else {
-                question.weight = Math.min(50, question.weight + 10);
+            } else { // Full Quiz Mode Logic
+                if (isCorrect) {
+                    if (!question.mastered) {
+                        question.mastered = true;
+                        question.weight = 2;
+                    } else {
+                        question.weight = Math.max(1, question.weight - 2);
+                    }
+                } else {
+                    question.weight = Math.min(50, question.weight + 10);
+                }
             }
         }
         
@@ -633,7 +729,7 @@
         }
 
         function displayRoundSummary() {
-            const percentage = Math.round((roundScore / currentRoundQuestions.length) * 100);
+            const percentage = currentRoundQuestions.length > 0 ? Math.round((roundScore / currentRoundQuestions.length) * 100) : 0;
             ui.scoreText.textContent = `${percentage}%`;
             showScreen('summary');
         }
@@ -671,7 +767,9 @@
         // --- Event Listeners ---
         ui.mainMenuBtn.addEventListener('click', goToMainMenu);
         ui.startFlashcardBtn.addEventListener('click', startFlashcards);
-        ui.startQuizBtn.addEventListener('click', startQuiz);
+        ui.startAdaptiveQuizBtn.addEventListener('click', startAdaptiveQuiz);
+        ui.startFullQuizBtn.addEventListener('click', startFullQuiz);
+
         ui.flipCardBtn.addEventListener('click', () => ui.flashcardContainer.classList.toggle('is-flipped'));
         ui.nextCardBtn.addEventListener('click', () => {
             flashcardIndex = (flashcardIndex + 1) % TOTAL_QUESTIONS;
@@ -683,7 +781,12 @@
         });
         ui.submitBtn.addEventListener('click', handleSubmit);
         ui.answerInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleSubmit();
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent form submission if it were in a form
+                if (!ui.submitBtn.disabled) {
+                    handleSubmit();
+                }
+            }
         });
         ui.nextBtn.addEventListener('click', handleNextQuestion);
         ui.nextRoundBtn.addEventListener('click', () => {
